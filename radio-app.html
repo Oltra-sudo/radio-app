@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radio Prototyp</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 400px; background: white; min-height: 100vh; box-shadow: 0 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
+        .header { background: #e50914; color: white; padding: 15px; text-align: center; font-size: 1.2rem; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .nav-btn { background: white; color: #e50914; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
+        .content { padding: 20px; flex-grow: 1; }
+        .card { background: #f9f9f9; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; }
+        .track-title { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
+        .track-artist { color: #555; margin-bottom: 15px; }
+        .play-btn { width: 100%; background: #28a745; color: white; border: none; padding: 15px; border-radius: 8px; font-size: 1.1rem; cursor: pointer; margin-bottom: 15px; }
+        .play-btn.playing { background: #dc3545; }
+        .rating-stars span { font-size: 1.5rem; cursor: pointer; color: #ccc; }
+        .rating-stars span.active { color: #ffc107; }
+        input[type="text"], textarea { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button.submit-btn { margin-top: 10px; background: #007bff; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; width: 100%; }
+        .hidden { display: none; }
+        .dashboard-item { border-bottom: 1px solid #eee; padding: 10px 0; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header">
+        <span id="view-title">Hörer-Ansicht</span>
+        <button class="nav-btn" onclick="toggleView()">Wechseln</button>
+    </div>
+
+    <!-- HÖRER ANSICHT -->
+    <div id="listener-view" class="content">
+        <!-- US1: Player & Track Info -->
+        <div class="card">
+            <div class="track-title" id="song-title">Lade Titel...</div>
+            <div class="track-artist" id="song-artist">Bitte warten</div>
+            <div style="font-size: 0.8rem; color: #888; margin-bottom: 15px;">Album: <span id="song-album">-</span></div>
+            <button class="play-btn" id="play-pause-btn" onclick="togglePlay()">▶ Stream Starten</button>
+        </div>
+
+        <!-- US2: Playlist Bewertung -->
+        <div class="card">
+            <strong>Playlist bewerten:</strong>
+            <div class="rating-stars" id="playlist-rating" onclick="rate('playlist', event)">
+                <span data-val="1">★</span><span data-val="2">★</span><span data-val="3">★</span><span data-val="4">★</span><span data-val="5">★</span>
+            </div>
+            <small id="playlist-msg" style="color: green;"></small>
+        </div>
+
+        <!-- US4: Moderator Bewertung (Hier war der Fehler, jetzt korrigiert) -->
+        <div class="card">
+            <strong>Moderator bewerten (<span id="mod-name">Max</span>):</strong>
+            <div class="rating-stars" id="moderator-rating" onclick="rate('moderator', event)">
+                <span data-val="1">★</span><span data-val="2">★</span><span data-val="3">★</span><span data-val="4">★</span><span data-val="5">★</span>
+            </div>
+            <small id="moderator-msg" style="color: green;"></small>
+        </div>
+
+        <!-- US3: Musikwunsch -->
+        <div class="card">
+            <strong>Musikwunsch äußern:</strong>
+            <input type="text" id="wish-artist" placeholder="Interpret">
+            <input type="text" id="wish-title" placeholder="Songtitel">
+            <button class="submit-btn" onclick="submitWish()">Wunsch senden</button>
+            <small id="wish-msg" style="color: green;"></small>
+        </div>
+    </div>
+
+    <!-- MODERATOR ANSICHT (US5) -->
+    <div id="moderator-view" class="content hidden">
+        <h3>Live-Dashboard</h3>
+        <p>Eingehendes Hörer-Feedback in Echtzeit (simuliert):</p>
+        <div class="card" id="dashboard-feed">
+            <em>Noch keine Daten vorhanden...</em>
+        </div>
+        <button class="nav-btn" style="background:#e50914; color:white; width:100%; margin-top:20px;" onclick="clearData()">Daten löschen</button>
+    </div>
+</div>
+
+<script>
+    // Stub-Daten (Simuliertes Backend)
+    const currentTrack = { title: "Blinding Lights", artist: "The Weeknd", album: "After Hours", moderator: "Sarah" };
+    let isPlaying = false;
+    let feedbackLog = JSON.parse(localStorage.getItem('radioFeedback')) || [];
+
+    // App initialisieren
+    function initApp() {
+        document.getElementById('song-title').innerText = currentTrack.title;
+        document.getElementById('song-artist').innerText = currentTrack.artist;
+        document.getElementById('song-album').innerText = currentTrack.album;
+        document.getElementById('mod-name').innerText = currentTrack.moderator;
+        updateDashboard();
+    }
+
+    // US1: Play/Pause Logik
+    function togglePlay() {
+        const btn = document.getElementById('play-pause-btn');
+        isPlaying = !isPlaying;
+        if(isPlaying) {
+            btn.innerText = "⏸ Stream Pausiert";
+            btn.classList.add("playing");
+        } else {
+            btn.innerText = "▶ Stream Starten";
+            btn.classList.remove("playing");
+        }
+    }
+
+    // US2 & US4: Bewertungslogik
+    function rate(type, event) {
+        if(event.target.tagName !== 'SPAN') return;
+        const value = event.target.getAttribute('data-val');
+        
+        // Sterne optisch füllen
+        const stars = document.getElementById(type + '-rating').children;
+        for(let i=0; i<5; i++) {
+            stars[i].classList.toggle('active', i < value);
+        }
+
+        // Nachricht anzeigen & Speichern
+        document.getElementById(type + '-msg').innerText = "Danke für " + value + " Sterne!";
+        saveFeedback(`Hat ${type === 'playlist' ? 'die Playlist' : 'Moderator ' + currentTrack.moderator} mit ${value} Sternen bewertet.`);
+        
+        setTimeout(() => document.getElementById(type + '-msg').innerText = "", 3000);
+    }
+
+    // US3: Musikwunsch senden
+    function submitWish() {
+        const artist = document.getElementById('wish-artist').value;
+        const title = document.getElementById('wish-title').value;
+        if(artist && title) {
+            saveFeedback(`Musikwunsch: ${artist} - ${title}`);
+            document.getElementById('wish-artist').value = "";
+            document.getElementById('wish-title').value = "";
+            document.getElementById('wish-msg').innerText = "Wunsch gesendet!";
+            setTimeout(() => document.getElementById('wish-msg').innerText = "", 3000);
+        } else {
+            alert("Bitte Interpret und Titel angeben!");
+        }
+    }
+
+    // US5: Speichern in den LocalStorage (Stubbing)
+    function saveFeedback(msg) {
+        const time = new Date().toLocaleTimeString();
+        feedbackLog.unshift(`[${time}] ${msg}`);
+        localStorage.setItem('radioFeedback', JSON.stringify(feedbackLog));
+        updateDashboard();
+    }
+
+    // Dashboard aktualisieren
+    function updateDashboard() {
+        const feed = document.getElementById('dashboard-feed');
+        if(feedbackLog.length === 0) {
+            feed.innerHTML = "<em>Noch keine Daten vorhanden...</em>";
+            return;
+        }
+        feed.innerHTML = feedbackLog.map(item => `<div class="dashboard-item">${item}</div>`).join('');
+    }
+
+    // Daten zurücksetzen
+    function clearData() {
+        localStorage.removeItem('radioFeedback');
+        feedbackLog = [];
+        updateDashboard();
+        alert("Dashboard geleert!");
+    }
+
+    // Ansicht wechseln
+    function toggleView() {
+        const lv = document.getElementById('listener-view');
+        const mv = document.getElementById('moderator-view');
+        const title = document.getElementById('view-title');
+        
+        if(lv.classList.contains('hidden')) {
+            lv.classList.remove('hidden');
+            mv.classList.add('hidden');
+            title.innerText = "Hörer-Ansicht";
+        } else {
+            lv.classList.add('hidden');
+            mv.classList.remove('hidden');
+            title.innerText = "Moderator-Ansicht";
+        }
+    }
+
+    // Start
+    initApp();
+</script>
+</body>
+</html>
